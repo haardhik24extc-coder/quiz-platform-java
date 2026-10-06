@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz Platform</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f4f6f8;margin:0;color:#1f2937}header{background:#172554;color:white;padding:22px 7%}main{max-width:1100px;margin:30px auto;padding:0 20px}.tabs{display:flex;gap:10px;margin-bottom:20px}.tabs button{padding:12px 18px;border:0;border-radius:8px;cursor:pointer}.active{background:#172554;color:white}.panel{background:white;border-radius:12px;padding:22px;box-shadow:0 3px 14px #0001;margin-bottom:20px}input,textarea{width:100%;padding:10px;margin:7px 0 14px;box-sizing:border-box;border:1px solid #ccd2da;border-radius:7px}button.primary{background:#2563eb;color:white;border:0;padding:11px 16px;border-radius:7px;cursor:pointer}.question{border:1px solid #ddd;padding:15px;border-radius:9px;margin:15px 0}.option{margin:7px 0}.quiz-card{border:1px solid #ddd;padding:15px;border-radius:9px;margin:10px 0}.hidden{display:none}.result{font-weight:bold;font-size:18px;margin-top:15px}
+</style></head>
+<body>
+<header><h1>Quiz Platform</h1><div>Teachers create quizzes • Students attempt quizzes</div></header>
+<main>
+<div class="tabs"><button id="teacherTab" class="active" onclick="show('teacher')">Teacher</button><button id="studentTab" onclick="show('student')">Student</button></div>
+<section id="teacher" class="panel">
+<h2>Create Quiz</h2><input id="teacherUsername" value="teacher" placeholder="Teacher username"><input id="title" placeholder="Quiz title"><textarea id="description" placeholder="Quiz description"></textarea>
+<div id="questions"></div><button class="primary" onclick="addQuestion()">+ Add Question</button> <button class="primary" onclick="createQuiz()">Create Quiz</button><div id="teacherMsg"></div>
+</section>
+<section id="student" class="panel hidden"><h2>Available Quizzes</h2><div id="quizList">Loading...</div><div id="attempt"></div></section>
+</main>
+<script>
+let qCount=0, currentQuiz=null;
+function show(id){document.getElementById('teacher').classList.toggle('hidden',id!=='teacher');document.getElementById('student').classList.toggle('hidden',id!=='student');document.getElementById('teacherTab').classList.toggle('active',id==='teacher');document.getElementById('studentTab').classList.toggle('active',id==='student');if(id==='student')loadQuizzes();}
+function addQuestion(){qCount++;const d=document.createElement('div');d.className='question';d.id='q'+qCount;d.innerHTML=`<input class="qtext" placeholder="Question ${qCount}"><input class="opt" placeholder="Option A"><label><input type="radio" name="correct${qCount}" value="0" checked> Correct</label><input class="opt" placeholder="Option B"><label><input type="radio" name="correct${qCount}" value="1"> Correct</label><input class="opt" placeholder="Option C"><label><input type="radio" name="correct${qCount}" value="2"> Correct</label><input class="opt" placeholder="Option D"><label><input type="radio" name="correct${qCount}" value="3"> Correct</label>`;document.getElementById('questions').appendChild(d);}
+async function createQuiz(){const qs=[...document.querySelectorAll('.question')].map((d,i)=>{const opts=[...d.querySelectorAll('.opt')];const correct=Number(d.querySelector('input[type=radio]:checked').value);return {text:d.querySelector('.qtext').value,options:opts.map((x,j)=>({text:x.value,correct:j===correct}))}});const body={teacherUsername:document.getElementById('teacherUsername').value,title:document.getElementById('title').value,description:document.getElementById('description').value,questions:qs};const r=await fetch('/api/quizzes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await r.json();document.getElementById('teacherMsg').innerText=r.ok?'Quiz created successfully! Quiz ID: '+data.id:'Error: '+data.error;}
+async function loadQuizzes(){const r=await fetch('/api/quizzes');const data=await r.json();document.getElementById('quizList').innerHTML=data.length?data.map(q=>`<div class="quiz-card"><h3>${q.title}</h3><p>${q.description||''}</p><button class="primary" onclick='start(${JSON.stringify(q)})'>Attempt Quiz</button></div>`).join(''):'No quizzes yet.';}
+function start(q){currentQuiz=q;document.getElementById('attempt').innerHTML=`<div class="panel"><h2>${q.title}</h2>${q.questions.map((x,i)=>`<div class="question"><b>${i+1}. ${x.text}</b>${x.options.map(o=>`<div class="option"><label><input type="radio" name="ans${x.id}" value="${o.id}"> ${o.optionText}</label></div>`).join('')}</div>`).join('')}<button class="primary" onclick="submitQuiz()">Submit Quiz</button><div id="result" class="result"></div></div>`;}
+async function submitQuiz(){const answers={};currentQuiz.questions.forEach(q=>{const a=document.querySelector(`input[name=ans${q.id}]:checked`);if(a)answers[q.id]=a.value});const r=await fetch('/api/quizzes/'+currentQuiz.id+'/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(answers)});const data=await r.json();document.getElementById('result').innerText='Score: '+data.score+' / '+currentQuiz.questions.length;}
+addQuestion();
+</script></body></html>
